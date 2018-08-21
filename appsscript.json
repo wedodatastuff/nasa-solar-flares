@@ -1,0 +1,14 @@
+{
+  "dataStudio": {
+    "name": "NASA Solar Flares",
+    "logoUrl": "https://api.nasa.gov/images/logo.png",
+    "company": "WeDoDataStuff.com",
+    "companyUrl": "https://wedodatastuff.com",
+    "addonUrl": "https://github.com/wedodatastuff/nasa-solar-flares",
+    "supportUrl": "https://github.com/wedodatastuff/nasa-solar-flares",
+    "description": "NASA's Open API provides data on solar flares: explosions of energy and visible light that reach Earth in 8 minutes.",
+    "authType": ["KEY"],
+    "feeType": ["FREE"]
+  },
+  "urlFetchWhitelist": ["https://api.nasa.gov/"]
+}
