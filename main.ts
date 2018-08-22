@@ -451,7 +451,7 @@ function isAuthValid(): boolean {
 
   if (credentials) {
     const url =
-      "https://api.nasa.gov/DONKI/CME" + "?api_key=" + credentials.key;
+      "https://api.nasa.gov/DONKI/FLR" + "?api_key=" + credentials.key;
 
     try {
       const response = UrlFetchApp.fetch(url);
@@ -544,20 +544,58 @@ function getConfig(request: GetConfigRequest): GetConfigResponse {
 /** Schema fields for this connector. */
 const SCHEMA: SchemaField[] = [
   {
-    name: "activityID",
-    label: "Activity ID",
+    name: "flrID",
+    label: "Solar Flare ID",
     dataType: SchemaFieldDataType.String,
     semantics: {
       conceptType: SchemaFieldConceptType.Dimension
     }
   },
   {
-    name: "startTime",
-    label: "Start Time",
+    name: "beginTime",
+    label: "Begin Time",
     dataType: SchemaFieldDataType.String,
     semantics: {
       conceptType: SchemaFieldConceptType.Dimension,
       semanticType: SchemaFieldSemanticType.YearMonthDayHour
+    }
+  },
+  {
+    name: "peakTime",
+    label: "Peak Time",
+    dataType: SchemaFieldDataType.String,
+    semantics: {
+      conceptType: SchemaFieldConceptType.Dimension,
+      semanticType: SchemaFieldSemanticType.YearMonthDayHour
+    }
+  },
+  {
+    name: "endTime",
+    label: "End Time",
+    dataType: SchemaFieldDataType.String,
+    semantics: {
+      conceptType: SchemaFieldConceptType.Dimension,
+      semanticType: SchemaFieldSemanticType.YearMonthDayHour
+    }
+  },
+  {
+    name: "classType",
+    label: "Class Type",
+    dataType: SchemaFieldDataType.String,
+    semantics: {
+      conceptType: SchemaFieldConceptType.Dimension
+    }
+  },
+  {
+    name: "classTypeMultiplier",
+    label: "Class Type Multiplier",
+    description:
+      "The value represents the solar flare class type as a number instead of a string so it may be treated as a metric. A1 = 1, B1 = 10, C1 = 100, M1 = 1000, X1 = 10000.",
+    dataType: SchemaFieldDataType.Number,
+    semantics: {
+      conceptType: SchemaFieldConceptType.Metric,
+      semanticType: SchemaFieldSemanticType.Number,
+      isReaggretable: true
     }
   },
   {
@@ -571,87 +609,6 @@ const SCHEMA: SchemaField[] = [
   {
     name: "activeRegionNum",
     label: "Active Region",
-    dataType: SchemaFieldDataType.String,
-    semantics: {
-      conceptType: SchemaFieldConceptType.Dimension
-    }
-  },
-  {
-    name: "cmeAnalysisTime21_5",
-    label: "CME Time",
-    dataType: SchemaFieldDataType.String,
-    semantics: {
-      conceptType: SchemaFieldConceptType.Dimension,
-      semanticType: SchemaFieldSemanticType.YearMonthDayHour
-    }
-  },
-  {
-    name: "cmeAnalysisLatitudeLongitude",
-    label: "CME Latitude and Longitude",
-    dataType: SchemaFieldDataType.String,
-    semantics: {
-      conceptType: SchemaFieldConceptType.Dimension,
-      semanticType: SchemaFieldSemanticType.LatitudeLongitude
-    }
-  },
-  {
-    name: "cmeAnalysisHalfAngle",
-    label: "CME Half Angle",
-    dataType: SchemaFieldDataType.Number,
-    semantics: {
-      conceptType: SchemaFieldConceptType.Metric,
-      semanticType: SchemaFieldSemanticType.Number
-    },
-    defaultAggregationType: SchemaFieldAggregationType.Average
-  },
-  {
-    name: "cmeAnalysisSpeed",
-    label: "CME Speed",
-    dataType: SchemaFieldDataType.Number,
-    semantics: {
-      conceptType: SchemaFieldConceptType.Metric,
-      semanticType: SchemaFieldSemanticType.Number
-    },
-    defaultAggregationType: SchemaFieldAggregationType.Average
-  },
-  {
-    name: "cmeAnalysisType",
-    label: "CME Type",
-    dataType: SchemaFieldDataType.String,
-    semantics: {
-      conceptType: SchemaFieldConceptType.Dimension
-    }
-  },
-  {
-    name: "cmeAnalysisNote",
-    label: "CME Note",
-    dataType: SchemaFieldDataType.String,
-    semantics: {
-      conceptType: SchemaFieldConceptType.Dimension,
-      semanticType: SchemaFieldSemanticType.Text
-    }
-  },
-  {
-    name: "cmeAnalysisLevelOfData",
-    label: "CME Level of Data",
-    dataType: SchemaFieldDataType.Number,
-    semantics: {
-      conceptType: SchemaFieldConceptType.Dimension,
-      semanticType: SchemaFieldSemanticType.Number
-    }
-  },
-  {
-    name: "note",
-    label: "Note",
-    dataType: SchemaFieldDataType.String,
-    semantics: {
-      conceptType: SchemaFieldConceptType.Dimension,
-      semanticType: SchemaFieldSemanticType.Text
-    }
-  },
-  {
-    name: "catalog",
-    label: "Catalog",
     dataType: SchemaFieldDataType.String,
     semantics: {
       conceptType: SchemaFieldConceptType.Dimension
@@ -712,7 +669,7 @@ function fetchData(request: GetDataRequest): any {
   const startDate = request.dateRange.startDate;
   const endDate = request.dateRange.endDate;
   const url =
-    "https://api.nasa.gov/DONKI/CME" +
+    "https://api.nasa.gov/DONKI/FLR" +
     "?api_key=" +
     credentials.key +
     "&startDate=" +
@@ -738,28 +695,10 @@ function transformData(request: GetDataRequest, data: any): DataRow[] {
   logEntry("transformData", data);
 
   const rows = [];
-  for (let i = 0; i < data.length; i++) {
-    const item = data[i];
-    let itemAnalysis = null;
-
-    if (!item.cmeAnalyses) {
-      continue;
-    }
-
-    for (let j = 0; j < item.cmeAnalyses.length; j++) {
-      if (item.cmeAnalyses[j].isMostAccurate) {
-        itemAnalysis = item.cmeAnalyses[j];
-        break;
-      }
-    }
-    if (!itemAnalysis) {
-      itemAnalysis = item.cmeAnalyses[0];
-    }
-
+  for (let item of data) {
     const values = [];
-    for (let k = 0; k < request.fields.length; k++) {
-      const field = request.fields[k];
-      values.push(DATA_TO_SCHEMA_MAP[field.name](item, itemAnalysis));
+    for (let field of request.fields) {
+      values.push(DATA_TO_SCHEMA_MAP[field.name](item));
     }
 
     rows.push({ values: values });
@@ -770,18 +709,50 @@ function transformData(request: GetDataRequest, data: any): DataRow[] {
 }
 
 const DATA_TO_SCHEMA_MAP = {
-  activityID: (i, ia) => i.activityID,
-  startTime: (i, ia) => dateToYMDH(new Date(i.startTime)),
-  sourceLocation: (i, ia) => i.sourceLocation,
-  activeRegionNum: (i, ia) => i.activeRegionNum,
-  cmeAnalysisTime21_5: (i, ia) => dateToYMDH(new Date(ia.time21_5)),
-  cmeAnalysisLatitudeLongitude: (i, ia) =>
-    "" + ia.latitude + "," + ia.longitude,
-  cmeAnalysisHalfAngle: (i, ia) => ia.halfAngle,
-  cmeAnalysisSpeed: (i, ia) => ia.speed,
-  cmeAnalysisType: (i, ia) => ia.type,
-  cmeAnalysisNote: (i, ia) => ia.note,
-  cmeAnalysisLevelOfData: (i, ia) => ia.levelOfData,
-  note: (i, ia) => i.note,
-  catalog: (i, ia) => i.catalog
+  flrID: i => i.flrID,
+  beginTime: i => dateToYMDH(new Date(i.beginTime)),
+  peakTime: i => dateToYMDH(new Date(i.peakTime)),
+  endTime: i => dateToYMDH(new Date(i.endTime)),
+  classType: i => i.classType,
+  classTypeMultiplier: i => classTypeToMultiplier(i.classType),
+  sourceLocation: i => i.sourceLocation,
+  activeRegionNum: i => i.activeRegionNum
 };
+
+const CLASS_TYPE_REGEX = /([abcmx])([1-9]\.?[0-9]*)/i;
+
+const MULTIPLIERS = {
+  A: 1,
+  B: 10,
+  C: 100,
+  M: 1000,
+  X: 10000
+};
+
+/**
+ * Converts a solar flare class designation to its equivalent number so it
+ * may be treated as a metric.
+ *
+ * @param classType - solar flare class designation [ABCMX][1-9]
+ */
+function classTypeToMultiplier(classType: string): number {
+  let mult = 0;
+
+  try {
+    if (classType) {
+      const matchArray = CLASS_TYPE_REGEX.exec(classType.toUpperCase());
+      if (matchArray) {
+        const letter = matchArray[1];
+        const number = parseFloat(matchArray[2]);
+
+        mult = MULTIPLIERS[letter] * number;
+      }
+    }
+  } catch (err) {
+    logError(
+      "classTypeToMultiplier failed to parse the class type: " + classType
+    );
+  }
+
+  return mult;
+}
